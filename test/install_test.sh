@@ -6,7 +6,7 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 export HOME="$TMP/home" NO_COLOR=1; mkdir -p "$HOME"
 PROJ="$TMP/proj"; git init -q "$PROJ"
 EXCL="$PROJ/.git/info/exclude"
-run() { "$INSTALL" "$@" -y >/dev/null; }
+run() { "$INSTALL" "$@" >/dev/null; }
 pass=0; check() { if eval "$2"; then pass=$((pass + 1)); else echo "FAIL: $1"; exit 1; fi; }
 
 run -s user -a
@@ -28,7 +28,7 @@ rmdir "$PROJ/.claude/skills/release"
 run uninstall -p "$PROJ"
 check "uninstall clean" '[[ ! -e $PROJ/.claude/skills/gitflow && ! -e $PROJ/.claude/.harness-tools ]] && ! grep -q harness-tools $EXCL'
 
-! "$INSTALL" -p "$PROJ" -t -m link -a -y >/dev/null 2>&1
+! "$INSTALL" -p "$PROJ" -t -m link -a >/dev/null 2>&1
 check "tracked+link refused" '[[ ! -e $PROJ/.claude/.harness-tools ]]'
 run -p "$PROJ" -t -a
 check "tracked copy, no exclude" '[[ -f $PROJ/.claude/skills/retoma/SKILL.md ]] && ! grep -q harness-tools $EXCL'
