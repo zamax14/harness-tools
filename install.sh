@@ -6,7 +6,12 @@
 # Run with no arguments for the interactive menu; flags are for scripting (see --help).
 set -euo pipefail
 
-REPO_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve through the ~/.local/bin symlink to the real repo. Empty when piped (curl | bash).
+SELF=$([[ -f ${BASH_SOURCE[0]:-} ]] && readlink -f "${BASH_SOURCE[0]}" || true)
+REPO_DIR=$([[ -n $SELF ]] && dirname "$SELF" || true)
+REPO_URL=${HARNESS_TOOLS_REPO:-https://github.com/zamax14/harness-tools.git}
+CLONE_DIR=${HARNESS_TOOLS_HOME:-$HOME/.local/share/harness-tools}
+BIN_DIR=${HARNESS_TOOLS_BIN:-$HOME/.local/bin}
 KINDS=(skills agents rules output-styles workflows)
 MANIFEST_NAME=".harness-tools"
 EXCLUDE_BEGIN="# >>> harness-tools"
@@ -27,13 +32,15 @@ usage() {
   cat <<EOF
 ${B}harness-tools installer${N}
 
-  ${C}./install.sh${N}                 open the interactive menu
+  ${C}harness-tools${N}                open the interactive menu (from any directory)
+  ${C}harness-tools update${N}         pull the latest version
+  ${C}harness-tools self-install${N}   put the harness-tools command on your PATH
 
 ${B}Scripting${N}
-  install.sh [install|uninstall|list|status] [options] [kind/name | name ...]
+  harness-tools [install|uninstall|list|status] [options] [kind/name | name ...]
 
   -s, --scope user|project   user → ~/.claude   project → <dir>/.claude
-  -p, --project DIR          project root (implies --scope project)
+  -p, --project DIR          project root (implies --scope project; default: git root of \$PWD)
   -m, --mode link|copy       default: link, or copy when tracked
   -t, --track                commit the files with the project
   -u, --untrack              hide them via .git/info/exclude (default)
@@ -43,9 +50,10 @@ ${B}Scripting${N}
   -h, --help                 this help
 
 ${B}Examples${N}
-  install.sh -s user -a                        everything into ~/.claude, symlinked
-  install.sh -p ~/code/app -t gitflow release  copy two skills into a project, tracked
-  install.sh uninstall -p ~/code/app           remove everything installed there
+  harness-tools -s user -a                     everything into ~/.claude, symlinked
+  harness-tools -s project gitflow             one skill into the project you are in
+  harness-tools -p ~/code/app -t -a            copy everything into a project, tracked
+  harness-tools uninstall -s project           remove everything installed here
 EOF
 }
 
@@ -54,7 +62,7 @@ CMD=install SCOPE="" PROJECT="" MODE="" TRACK="" ALL=0 DRY=0 FORCE=0
 ITEMS=() SELECTED=() ROWS=()
 
 parse_args() {
-  if [[ $# -gt 0 && "$1" =~ ^(install|uninstall|list|status)$ ]]; then CMD=$1; shift; fi
+  if [[ $# -gt 0 && "$1" =~ ^(install|uninstall|list|status|update|self-install)$ ]]; then CMD=$1; shift; fi
   while [[ $# -gt 0 ]]; do
     case $1 in
       -s|--scope)   SCOPE=${2:?--scope needs a value}; shift ;;
@@ -109,12 +117,13 @@ describe() { # id [max chars] -> one-line description (skill frontmatter), may b
 }
 
 # ---------- target ----------
+project_root() { git rev-parse --show-toplevel 2>/dev/null || pwd; }
 setup_target() {
   SCOPE=${SCOPE:-user}
   if [[ $SCOPE == user ]]; then
     ROOT="$HOME/.claude"; GIT_EXCLUDE=""; TRACK=""
   else
-    PROJECT=$(cd "${PROJECT:-$PWD}" 2>/dev/null && pwd) || die "project directory not found"
+    PROJECT=$(cd "${PROJECT:-$(project_root)}" 2>/dev/null && pwd) || die "project directory not found"
     ROOT="$PROJECT/.claude"
     if git -C "$PROJECT" rev-parse --git-dir >/dev/null 2>&1; then
       GIT_EXCLUDE=$(cd "$PROJECT" && realpath -m "$(git rev-parse --git-path info/exclude)")
@@ -332,12 +341,12 @@ tui() {
 
     menu_select "Where?" \
       "User          ~/.claude, every project" \
-      "This project  $PWD" \
+      "This project  $(project_root)" \
       "Other project choose a directory"
     ((PICK < 0)) && continue
     case $PICK in
       0) SCOPE=user ;;
-      1) SCOPE=project PROJECT=$PWD ;;
+      1) SCOPE=project PROJECT=$(project_root) ;;
       2) SCOPE=project
          while true; do
            ask_path "Project directory:" "$PWD/"
@@ -390,10 +399,39 @@ tui() {
   printf '%sbye%s\n' "$D" "$N"
 }
 
+# ---------- setup ----------
+self_install() {
+  mkdir -p "$BIN_DIR"
+  ln -sfn "$REPO_DIR/install.sh" "$BIN_DIR/harness-tools"
+  ok "harness-tools → $REPO_DIR"
+  [[ ":$PATH:" == *":$BIN_DIR:"* ]] || warn "$BIN_DIR is not on your PATH; add it to your shell profile"
+}
+
+update() {
+  git -C "$REPO_DIR" pull --ff-only -q || die "could not update $REPO_DIR (local changes?)"
+  ok "updated to $(git -C "$REPO_DIR" log -1 --format='%h %s')"
+}
+
+bootstrap() { # piped from curl: clone, put the command on PATH, open the menu
+  command -v git >/dev/null || die "git is required"
+  if [[ -d $CLONE_DIR/.git ]]; then git -C "$CLONE_DIR" pull --ff-only -q
+  else git clone -q --depth 1 "$REPO_URL" "$CLONE_DIR"; fi
+  ok "harness-tools in $CLONE_DIR"
+  "$CLONE_DIR/install.sh" self-install
+  if [[ $# -eq 0 ]] && { true </dev/tty; } 2>/dev/null; then exec "$CLONE_DIR/install.sh" </dev/tty; fi
+  [[ $# -gt 0 ]] && exec "$CLONE_DIR/install.sh" "$@"
+  return 0
+}
+
 # ---------- main ----------
 main() {
   local nargs=$#
+  [[ -n $REPO_DIR ]] || { bootstrap "$@"; return; }
   parse_args "$@"
+  case $CMD in
+    self-install) self_install; return ;;
+    update)       update; return ;;
+  esac
   discover
   [[ ${#ITEMS[@]} -gt 0 ]] || die "no items found in $REPO_DIR"
 

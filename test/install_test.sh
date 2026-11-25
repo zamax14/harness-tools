@@ -35,4 +35,10 @@ check "tracked copy, no exclude" '[[ -f $PROJ/.claude/skills/retoma/SKILL.md ]] 
 run uninstall -p "$PROJ" retoma
 check "tracked uninstall adds no exclude" '! grep -q harness-tools $EXCL && [[ ! -e $PROJ/.claude/skills/retoma ]]'
 
+HARNESS_TOOLS_BIN="$HOME/bin" "$INSTALL" self-install >/dev/null 2>&1
+check "self-install links command" '[[ $(readlink -f $HOME/bin/harness-tools) == $(readlink -f $INSTALL) ]]'
+mkdir -p "$PROJ/src/deep"
+(cd "$PROJ/src/deep" && "$HOME/bin/harness-tools" -s project gitflow >/dev/null)
+check "command from subdir installs at git root" '[[ -L $PROJ/.claude/skills/gitflow && ! -e $PROJ/src/deep/.claude ]]'
+
 echo "ok: $pass checks passed"
