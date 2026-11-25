@@ -7,7 +7,7 @@ and installed anywhere with one interactive command.**
 
 ![bash](https://img.shields.io/badge/bash-5%2B-4EAA25?logo=gnubash&logoColor=white)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-skills-D97757?logo=anthropic&logoColor=white)
-![deps](https://img.shields.io/badge/dependencies-none-blue)
+![deps](https://img.shields.io/badge/dependencies-git%20only-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 </div>
@@ -25,10 +25,21 @@ This repo is the single source of truth. The installer puts each piece where it 
 ## Quick start
 
 ```bash
-git clone https://github.com/zamax14/harness-tools.git
-cd harness-tools
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/zamax14/harness-tools/main/install.sh | bash
 ```
+
+That clones the repo into `~/.local/share/harness-tools`, puts a `harness-tools` command in
+`~/.local/bin` and opens the menu. From then on, run it **from any project**:
+
+```bash
+cd ~/code/my-app
+harness-tools            # "This project" = the git root you are in; or pick ~/.claude
+harness-tools update     # pull the latest version
+```
+
+Prefer your own clone (to edit the skills)? Clone it anywhere and run
+`./install.sh self-install` — the command then points at your clone, and linked items pick up
+your edits instantly.
 
 ```text
   ╭─────────────────────────────────────────╮
@@ -84,7 +95,7 @@ The repo mirrors `.claude/`. Drop a file in a kind folder and the installer pick
 
 ```text
 harness-tools/
-├── install.sh                 interactive installer (pure bash, no dependencies)
+├── install.sh                 the harness-tools command (pure bash, needs only git)
 ├── skills/<name>/SKILL.md     → .claude/skills/<name>/
 ├── agents/<name>.md           → .claude/agents/          (planned)
 ├── rules/<name>.md            → .claude/rules/           (planned)
@@ -98,11 +109,11 @@ harness-tools/
 No arguments opens the menu; flags run non-interactively (CI, dotfiles bootstrap).
 
 ```bash
-./install.sh -s user -a                       # everything into ~/.claude, symlinked
-./install.sh -p ~/code/app gitflow release    # two skills into a project, untracked
-./install.sh -p ~/code/app -t -a              # all into a project, copied and tracked
-./install.sh status | list | uninstall [...]  # inspect or remove
-./install.sh --help
+harness-tools -s user -a                      # everything into ~/.claude, symlinked
+harness-tools -s project gitflow release      # two skills into the project you are in
+harness-tools -p ~/code/app -t -a             # all into another project, copied and tracked
+harness-tools status | list | uninstall [...] # inspect or remove
+harness-tools --help
 ```
 
 `-n` dry-runs anything; `-f` overwrites files the installer did not create.
