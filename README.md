@@ -8,6 +8,7 @@ and installed anywhere with one interactive command.**
 ![bash](https://img.shields.io/badge/bash-5%2B-4EAA25?logo=gnubash&logoColor=white)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-skills-D97757?logo=anthropic&logoColor=white)
 ![deps](https://img.shields.io/badge/dependencies-none-blue)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 </div>
 
@@ -111,3 +112,7 @@ No arguments opens the menu; flags run non-interactively (CI, dotfiles bootstrap
 ```bash
 test/install_test.sh    # throwaway HOME + git repo, asserts install/update/uninstall paths
 ```
+
+## License
+
+[MIT](LICENSE)
